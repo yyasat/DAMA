@@ -510,7 +510,7 @@
     </div>
 
     <div class="zone-info-row" id="zone-info-row">
-        <span class="zone-tip" id="zone-tip">拖动新增 · 点击已有层删除</span>
+        <span class="zone-tip" id="zone-tip">空白处拖拽新增 · 拖拽层移动 · 点击删除</span>拖动新增 · 点击已有层删除</span>
         <span class="zone-count-badge" id="zone-count">0 个禁止层</span>
         <button class="zone-clear-btn" onclick="clearZones()">全部清除</button>
     </div>
@@ -565,6 +565,8 @@
     let snapshot = null;
     let historyStack = [];
     let historyStep  = -1;
+    let movingZoneIndex = -1;
+    let zoneStartPos    = null;
 
     // 多图队列
     let imageQueue   = [];   // { dataUrl, editedData }
@@ -636,20 +638,18 @@
         showToast(`已新增禁止层，共 ${excludeZones.length} 个`);
     }
 
-    function removeZoneAt(px, py) {
+    // 用这个函数替换掉原来的 removeZoneAt 函数
+    function getZoneAt(px, py) {
         for (let i = excludeZones.length - 1; i >= 0; i--) {
             const z = excludeZones[i];
             const lx = Math.min(z.x, z.x + z.w);
             const ly = Math.min(z.y, z.y + z.h);
             const lw = Math.abs(z.w), lh = Math.abs(z.h);
             if (px >= lx && px <= lx + lw && py >= ly && py <= ly + lh) {
-                excludeZones.splice(i, 1);
-                drawZoneOverlay();
-                showToast(`已删除禁止层，剩余 ${excludeZones.length} 个`);
-                return true;
+                return i;
             }
         }
-        return false;
+        return -1;
     }
 
     function clearZones() {
@@ -881,19 +881,35 @@
         isDrawing = true;
         const pos = getEventPos(e);
         startX = pos.x; startY = pos.y;
+        
         if (currentMode === 'box') {
             snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
         } else if (currentMode === 'zone') {
-            // 不操作 canvas
+            // 检测是否点中了已有的禁止层
+            const zIdx = getZoneAt(pos.x, pos.y);
+            if (zIdx !== -1) {
+                movingZoneIndex = zIdx;
+                // 标准化宽高，方便后续计算坐标移动
+                let z = excludeZones[zIdx];
+                z.x = Math.min(z.x, z.x + z.w);
+                z.y = Math.min(z.y, z.y + z.h);
+                z.w = Math.abs(z.w);
+                z.h = Math.abs(z.h);
+                zoneStartPos = { x: pos.x, y: pos.y, origX: z.x, origY: z.y };
+            } else {
+                movingZoneIndex = -1;
+            }
         } else {
             const sz = parseInt(document.getElementById('blur-radius').value)*3;
             applyBlurToRect(pos.x-sz/2, pos.y-sz/2, sz, sz);
         }
     }
+    
     function handleMove(e) {
         if (!isDrawing || currentMode === 'pan') return;
         if (e.cancelable) e.preventDefault();
         const pos = getEventPos(e);
+        
         if (currentMode === 'box') {
             ctx.putImageData(snapshot, 0, 0);
             ctx.save();
@@ -903,16 +919,27 @@
             ctx.strokeRect(startX, startY, pos.x-startX, pos.y-startY);
             ctx.restore();
         } else if (currentMode === 'zone') {
-            // 实时预览禁止层拖动范围
-            drawZoneOverlay({ x: startX, y: startY, w: pos.x - startX, h: pos.y - startY });
+            if (movingZoneIndex !== -1) {
+                // 拖动已有禁止层
+                const dx = pos.x - zoneStartPos.x;
+                const dy = pos.y - zoneStartPos.y;
+                excludeZones[movingZoneIndex].x = zoneStartPos.origX + dx;
+                excludeZones[movingZoneIndex].y = zoneStartPos.origY + dy;
+                drawZoneOverlay();
+            } else {
+                // 实时预览新禁止层的拖动范围
+                drawZoneOverlay({ x: startX, y: startY, w: pos.x - startX, h: pos.y - startY });
+            }
         } else {
             const sz = parseInt(document.getElementById('blur-radius').value)*3;
             applyBlurToRect(pos.x-sz/2, pos.y-sz/2, sz, sz);
         }
     }
+    
     function handleEnd(e) {
         if (!isDrawing || currentMode === 'pan') return;
         isDrawing = false;
+        
         if (currentMode === 'box') {
             ctx.putImageData(snapshot, 0, 0);
             const pos = getEventPos(e.changedTouches ? e.changedTouches[0] : e);
@@ -920,13 +947,26 @@
             saveState();
         } else if (currentMode === 'zone') {
             const pos = getEventPos(e.changedTouches ? e.changedTouches[0] : e);
-            const w = pos.x - startX, h = pos.y - startY;
-            if (Math.abs(w) < 10 && Math.abs(h) < 10) {
-                // 点击：删除命中的禁止层
-                removeZoneAt(pos.x, pos.y);
+            
+            if (movingZoneIndex !== -1) {
+                // 结束移动
+                const dx = pos.x - zoneStartPos.x;
+                const dy = pos.y - zoneStartPos.y;
+                // 核心逻辑：如果位移极小（小于5像素），判定为“轻点”，执行删除操作
+                if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
+                    excludeZones.splice(movingZoneIndex, 1);
+                    showToast(`已删除禁止层，剩余 ${excludeZones.length} 个`);
+                }
+                movingZoneIndex = -1;
+                drawZoneOverlay();
             } else {
-                // 拖动：新增禁止层
-                addZone(startX, startY, w, h);
+                // 结束新增
+                const w = pos.x - startX, h = pos.y - startY;
+                if (Math.abs(w) >= 10 || Math.abs(h) >= 10) {
+                    addZone(startX, startY, w, h);
+                } else {
+                    drawZoneOverlay(); // 清理残留的预览框
+                }
             }
         } else {
             saveState();
