@@ -60,6 +60,9 @@
     let historyStep  = -1;
     let movingZoneIndex = -1;
     let zoneStartPos    = null;
+    let resizingZoneIndex = -1;  // 正在拖动缩放的禁止层下标
+    let resizeCorner      = null; // 当前拖动的是哪个角：nw/ne/sw/se
+    let resizeAnchor      = null; // 缩放时固定不动的对角坐标
     
     // 水印图层状态（独立于主画布，随时可根据禁止层重新计算，不需要"烘焙"进图片）
     let isWmMode = false;          // 是否正打开水印设置面板
@@ -95,6 +98,11 @@
             const ly = Math.min(z.y, z.y + z.h);
             const lw = Math.abs(z.w);
             const lh = Math.abs(z.h);
+            const hr = Math.max(6, canvas.width / 160);
+            const hsw = Math.max(1.5, canvas.width / 500);
+            const handles = [[lx,ly],[lx+lw,ly],[lx,ly+lh],[lx+lw,ly+lh]].map(([hx,hy]) =>
+                `<circle cx="${hx}" cy="${hy}" r="${hr}" fill="#e05555" stroke="#fff" stroke-width="${hsw}"/>`
+            ).join('');
             return `<g>
                 <rect x="${lx}" y="${ly}" width="${lw}" height="${lh}"
                       fill="rgba(210,55,55,0.13)" stroke="#e05555" stroke-width="${sw}"
@@ -102,6 +110,7 @@
                 <text x="${lx + lw/2}" y="${ly + lh/2}" font-size="${fs}"
                       fill="rgba(220,60,60,0.65)" text-anchor="middle"
                       dominant-baseline="middle" font-family="Jost,sans-serif">✕</text>
+                ${handles}
             </g>`;
         }).join('');
 
@@ -148,6 +157,30 @@
             }
         }
         return -1;
+    }
+
+    // 判断是否点中了某个禁止层四角的缩放手柄，返回 {index, corner} 或 null
+    function getZoneHandleAt(px, py) {
+        const hitR = Math.max(16, canvas.width / 40);
+        for (let i = excludeZones.length - 1; i >= 0; i--) {
+            const z = excludeZones[i];
+            const lx = Math.min(z.x, z.x + z.w);
+            const ly = Math.min(z.y, z.y + z.h);
+            const lw = Math.abs(z.w), lh = Math.abs(z.h);
+            const corners = {
+                nw: { x: lx,      y: ly },
+                ne: { x: lx + lw, y: ly },
+                sw: { x: lx,      y: ly + lh },
+                se: { x: lx + lw, y: ly + lh },
+            };
+            for (const corner in corners) {
+                const c = corners[corner];
+                if (Math.hypot(px - c.x, py - c.y) <= hitR) {
+                    return { index: i, corner };
+                }
+            }
+        }
+        return null;
     }
 
     function clearZones() {
@@ -213,15 +246,16 @@
     /* ── 模式切换 ── */
     function switchMode(mode) {
         currentMode = mode;
-        // 清空上一次可能残留的拖拽/移动状态，避免出现"幽灵"禁止层预览框
+        // 清空上一次可能残留的拖拽/移动/缩放状态，避免出现"幽灵"禁止层预览框
         isDrawing = false;
         movingZoneIndex = -1;
+        resizingZoneIndex = -1;
         ['pan','box','brush','zone'].forEach(m => {
             const el = document.getElementById('mode-' + m);
             if (el) el.classList.remove('active');
         });
         document.getElementById('mode-' + mode).classList.add('active');
-        const labels = { pan: "浏览模式", box: "拉框打码模式", brush: "涂抹打码模式", zone: "禁止层模式 — 空白拖拽新增，拖拽移动，原地点击删除" };
+        const labels = { pan: "浏览模式", box: "拉框打码模式", brush: "涂抹打码模式", zone: "禁止层模式 — 空白拖拽新增，拖拽移动，拖角缩放，原地点击删除" };
         showToast(labels[mode] || "");
         drawZoneOverlay(); // 清除任何残留的预览框
         updateZoneUI();
@@ -453,17 +487,38 @@
         if (currentMode === 'box') {
             snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
         } else if (currentMode === 'zone') {
-            const zIdx = getZoneAt(pos.x, pos.y);
-            if (zIdx !== -1) {
-                movingZoneIndex = zIdx;
-                let z = excludeZones[zIdx];
+            const handle = getZoneHandleAt(pos.x, pos.y);
+            if (handle) {
+                const z = excludeZones[handle.index];
                 z.x = Math.min(z.x, z.x + z.w);
                 z.y = Math.min(z.y, z.y + z.h);
                 z.w = Math.abs(z.w);
                 z.h = Math.abs(z.h);
-                zoneStartPos = { x: pos.x, y: pos.y, origX: z.x, origY: z.y };
-            } else {
+                // 缩放时固定的是被拖动角的对角
+                const anchors = {
+                    nw: { x: z.x + z.w, y: z.y + z.h },
+                    ne: { x: z.x,       y: z.y + z.h },
+                    sw: { x: z.x + z.w, y: z.y },
+                    se: { x: z.x,       y: z.y },
+                };
+                resizingZoneIndex = handle.index;
+                resizeCorner = handle.corner;
+                resizeAnchor = anchors[handle.corner];
                 movingZoneIndex = -1;
+            } else {
+                resizingZoneIndex = -1;
+                const zIdx = getZoneAt(pos.x, pos.y);
+                if (zIdx !== -1) {
+                    movingZoneIndex = zIdx;
+                    let z = excludeZones[zIdx];
+                    z.x = Math.min(z.x, z.x + z.w);
+                    z.y = Math.min(z.y, z.y + z.h);
+                    z.w = Math.abs(z.w);
+                    z.h = Math.abs(z.h);
+                    zoneStartPos = { x: pos.x, y: pos.y, origX: z.x, origY: z.y };
+                } else {
+                    movingZoneIndex = -1;
+                }
             }
         } else {
             const sz = parseInt(document.getElementById('blur-radius').value)*3;
@@ -486,7 +541,15 @@
             ctx.strokeRect(startX, startY, pos.x-startX, pos.y-startY);
             ctx.restore();
         } else if (currentMode === 'zone') {
-            if (movingZoneIndex !== -1) {
+            if (resizingZoneIndex !== -1) {
+                const z = excludeZones[resizingZoneIndex];
+                z.x = resizeAnchor.x;
+                z.y = resizeAnchor.y;
+                z.w = pos.x - resizeAnchor.x;
+                z.h = pos.y - resizeAnchor.y;
+                drawZoneOverlay();
+                if (watermarkOn) drawRealTimeWatermark();
+            } else if (movingZoneIndex !== -1) {
                 const dx = pos.x - zoneStartPos.x;
                 const dy = pos.y - zoneStartPos.y;
                 excludeZones[movingZoneIndex].x = zoneStartPos.origX + dx;
@@ -517,7 +580,23 @@
         } else if (currentMode === 'zone') {
             const pos = getEventPos(e.changedTouches ? e.changedTouches[0] : e);
             
-            if (movingZoneIndex !== -1) {
+            if (resizingZoneIndex !== -1) {
+                const z = excludeZones[resizingZoneIndex];
+                const nx = Math.min(z.x, z.x + z.w);
+                const ny = Math.min(z.y, z.y + z.h);
+                const nw = Math.abs(z.w);
+                const nh = Math.abs(z.h);
+                if (nw < 10 || nh < 10) {
+                    excludeZones.splice(resizingZoneIndex, 1);
+                    showToast("禁止层太小，已删除");
+                } else {
+                    z.x = nx; z.y = ny; z.w = nw; z.h = nh;
+                    showToast("已调整禁止层大小");
+                }
+                resizingZoneIndex = -1;
+                drawZoneOverlay();
+                if (watermarkOn) drawRealTimeWatermark();
+            } else if (movingZoneIndex !== -1) {
                 const dx = pos.x - zoneStartPos.x;
                 const dy = pos.y - zoneStartPos.y;
                 if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
