@@ -152,6 +152,14 @@
             historyStack.shift();
             historyStep--;
         }
+        updateUndoRedoUI();
+    }
+
+    function updateUndoRedoUI() {
+        const undoBtn = document.getElementById('btn-undo');
+        const redoBtn = document.getElementById('btn-redo');
+        if (undoBtn) undoBtn.disabled = historyStep <= 0;
+        if (redoBtn) redoBtn.disabled = historyStep >= historyStack.length - 1;
     }
 
     function undo() {
@@ -161,13 +169,22 @@
             ctx.putImageData(state.imgData, 0, 0);
             excludeZones = JSON.parse(JSON.stringify(state.zones));
             drawZoneOverlay(); // 刷新层级显示
+            updateUndoRedoUI();
             showToast("已撤销");
         } else {
             showToast("已回到初始状态");
         }
     }
     function redo() {
-        if (historyStep < historyStack.length - 1) { historyStep++; ctx.putImageData(historyStack[historyStep], 0, 0); updateUndoRedoUI(); }
+        if (historyStep < historyStack.length - 1) {
+            historyStep++;
+            const state = historyStack[historyStep];
+            ctx.putImageData(state.imgData, 0, 0);
+            excludeZones = JSON.parse(JSON.stringify(state.zones));
+            drawZoneOverlay();
+            updateUndoRedoUI();
+            showToast("已重做");
+        }
     }
 
     /* ── 模式切换 ── */
@@ -221,7 +238,7 @@
             canvas.height = img.height;
             if (item.editedData) {
                 ctx.putImageData(item.editedData, 0, 0);
-                historyStack = [item.editedData];
+                historyStack = [{ imgData: item.editedData, zones: [] }];
                 historyStep  = 0;
             } else {
                 ctx.drawImage(img, 0, 0);
