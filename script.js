@@ -480,7 +480,8 @@
     }
     
     function handleMove(e) {
-        if (!isDrawing || currentMode === 'pan' || isWmMode) return;
+        if (!isDrawing || currentMode === 'pan') return;
+        if (isWmMode && currentMode !== 'zone') return;
         if (e.cancelable) e.preventDefault();
         const pos = getEventPos(e);
         
@@ -509,7 +510,8 @@
     }
     
     function handleEnd(e) {
-        if (!isDrawing || currentMode === 'pan' || isWmMode) return;
+        if (!isDrawing || currentMode === 'pan') return;
+        if (isWmMode && currentMode !== 'zone') return;
         isDrawing = false;
         
         if (currentMode === 'box') {
@@ -529,10 +531,12 @@
                 }
                 movingZoneIndex = -1;
                 drawZoneOverlay();
+                if (isWmMode) drawRealTimeWatermark(); // 禁止层变化后，水印需要重新铺满空出的区域
             } else {
                 const w = pos.x - startX, h = pos.y - startY;
                 if (Math.abs(w) >= 10 || Math.abs(h) >= 10) {
                     addZone(startX, startY, w, h);
+                    if (isWmMode) drawRealTimeWatermark();
                 } else {
                     drawZoneOverlay();
                 }
