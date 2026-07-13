@@ -446,9 +446,8 @@
         }
         .wm-row-2 {
             display: flex;
-            align-items: center;
-            gap: 16px;
-            flex-wrap: wrap;
+            flex-direction: column;
+            gap: 8px;
         }
         .wm-input-text {
             flex: 1; min-width: 120px;
@@ -462,7 +461,10 @@
             width: 24px; height: 24px; padding: 0; border: none; background: transparent; cursor: pointer; flex-shrink: 0;
         }
         .wm-slider-wrap {
-            display: flex; align-items: center; gap: 6px; flex: 1; min-width: 140px;
+            display: flex; align-items: center; gap: 6px; width: 100%;
+        }
+        .wm-slider-wrap .s-label {
+            flex-shrink: 0; min-width: 34px;
         }
         .wm-slider-wrap input[type="range"] {
             flex: 1;
