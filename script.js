@@ -58,6 +58,10 @@
     let historyStep  = -1;
     let movingZoneIndex = -1;
     let zoneStartPos    = null;
+    let resizingZoneIndex = -1;   // 正在缩放的禁止层下标
+    let resizeAnchor      = null; // 缩放时固定不动的锚点角
+    let lastZoneTapIndex  = -1;   // 用于识别"双击/双触"
+    let lastZoneTapTime   = 0;
     
     // 水印实时预览状态
     let wmSnapshot = null;
@@ -206,13 +210,20 @@
     /* ── 模式切换 ── */
     function switchMode(mode) {
         currentMode = mode;
+        // 清空上一次可能残留的拖拽/移动/缩放状态，避免出现"幽灵"禁止层预览框
+        isDrawing = false;
+        movingZoneIndex = -1;
+        resizingZoneIndex = -1;
+        lastZoneTapIndex = -1;
+        lastZoneTapTime = 0;
         ['pan','box','brush','zone'].forEach(m => {
             const el = document.getElementById('mode-' + m);
             if (el) el.classList.remove('active');
         });
         document.getElementById('mode-' + mode).classList.add('active');
-        const labels = { pan: "浏览模式", box: "拉框打码模式", brush: "涂抹打码模式", zone: "禁止层模式 — 拖动新增，点击删除" };
+        const labels = { pan: "浏览模式", box: "拉框打码模式", brush: "涂抹打码模式", zone: "禁止层模式 — 拖动新增，双击拖拽调整大小，点击删除" };
         showToast(labels[mode] || "");
+        drawZoneOverlay(); // 清除任何残留的预览框
         updateZoneUI();
     }
 
@@ -418,7 +429,9 @@
 
     /* ── 绘图事件 ── */
     function handleStart(e) {
-        if (!originalImage || currentMode === 'pan' || isWmMode) return;
+        if (!originalImage || currentMode === 'pan') return;
+        // 水印编辑模式下，只允许继续调整禁止层，其余模式（拉框/涂抹）仍然屏蔽
+        if (isWmMode && currentMode !== 'zone') return;
         if (e.cancelable) e.preventDefault();
         isDrawing = true;
         const pos = getEventPos(e);
@@ -429,15 +442,36 @@
         } else if (currentMode === 'zone') {
             const zIdx = getZoneAt(pos.x, pos.y);
             if (zIdx !== -1) {
-                movingZoneIndex = zIdx;
-                let z = excludeZones[zIdx];
-                z.x = Math.min(z.x, z.x + z.w);
-                z.y = Math.min(z.y, z.y + z.h);
-                z.w = Math.abs(z.w);
-                z.h = Math.abs(z.h);
-                zoneStartPos = { x: pos.x, y: pos.y, origX: z.x, origY: z.y };
+                const now = Date.now();
+                if (zIdx === lastZoneTapIndex && now - lastZoneTapTime < 400) {
+                    // 双击/双触：进入缩放模式，锚点为该禁止层的左上角，拖动即可调整大小
+                    resizingZoneIndex = zIdx;
+                    movingZoneIndex = -1;
+                    const z = excludeZones[zIdx];
+                    z.x = Math.min(z.x, z.x + z.w);
+                    z.y = Math.min(z.y, z.y + z.h);
+                    z.w = Math.abs(z.w);
+                    z.h = Math.abs(z.h);
+                    resizeAnchor = { x: z.x, y: z.y };
+                    lastZoneTapIndex = -1;
+                    lastZoneTapTime = 0;
+                    showToast("拖动调整大小，松手完成");
+                } else {
+                    movingZoneIndex = zIdx;
+                    resizingZoneIndex = -1;
+                    let z = excludeZones[zIdx];
+                    z.x = Math.min(z.x, z.x + z.w);
+                    z.y = Math.min(z.y, z.y + z.h);
+                    z.w = Math.abs(z.w);
+                    z.h = Math.abs(z.h);
+                    zoneStartPos = { x: pos.x, y: pos.y, origX: z.x, origY: z.y };
+                    lastZoneTapIndex = zIdx;
+                    lastZoneTapTime = now;
+                }
             } else {
                 movingZoneIndex = -1;
+                resizingZoneIndex = -1;
+                lastZoneTapIndex = -1;
             }
         } else {
             const sz = parseInt(document.getElementById('blur-radius').value)*3;
