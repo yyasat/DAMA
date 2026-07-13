@@ -547,6 +547,20 @@
 
         const fs = Math.max(16, Math.floor(canvas.width/24));
         ctx.save();
+
+        // 用禁止层区域挖空裁剪区，让水印跳过这些区域
+        if (excludeZones.length > 0) {
+            ctx.beginPath();
+            ctx.rect(0, 0, canvas.width, canvas.height);
+            excludeZones.forEach(z => {
+                const lx = Math.min(z.x, z.x + z.w);
+                const ly = Math.min(z.y, z.y + z.h);
+                const lw = Math.abs(z.w), lh = Math.abs(z.h);
+                ctx.rect(lx, ly, lw, lh);
+            });
+            ctx.clip('evenodd');
+        }
+
         ctx.font = `bold ${fs}px 'Jost', sans-serif`;
         ctx.fillStyle = hexToRgba(color, opacity);
         ctx.translate(canvas.width/2, canvas.height/2);
