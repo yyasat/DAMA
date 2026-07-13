@@ -1,6 +1,6 @@
     /* ── 主题切换 ── */
     const _mq = window.matchMedia('(prefers-color-scheme: light)');
-    let _currentTheme = 'dark';
+    let _currentTheme = 'light';
 
     function applyScheme(scheme) {
         if (scheme === 'light') document.documentElement.setAttribute('data-theme', 'light');
@@ -39,8 +39,8 @@
 
     // 初始化主题（页面加载时读取上次设置）
     (function() {
-        let saved = 'dark';
-        try { saved = localStorage.getItem('dama_theme') || 'dark'; } catch(e) {}
+        let saved = 'light';
+        try { saved = localStorage.getItem('dama_theme') || 'light'; } catch(e) {}
         setTheme(saved);
     })();
 

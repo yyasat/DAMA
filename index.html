@@ -22,24 +22,24 @@
     <div class="nav-core">
         <span class="brand">打码神器</span>
         <div id="img-nav" class="img-nav">
-            <button id="btn-prev" class="pg-btn" onclick="prevImage()">‹</button>
+            <button type="button" id="btn-prev" class="pg-btn" onclick="prevImage()">‹</button>
             <span id="img-counter" class="pg-count">01 / 01</span>
-            <button id="btn-next" class="pg-btn" onclick="nextImage()">›</button>
+            <button type="button" id="btn-next" class="pg-btn" onclick="nextImage()">›</button>
         </div>
     </div>
 
     <div class="nav-wing right">
-        <button id="btn-export-all" class="nav-pill dim" onclick="exportAll()" style="display:none;">全部导出</button>
-        <button id="btn-theme" class="nav-icon-btn" onclick="toggleThemePopup(event)" aria-label="主题设置">◐</button>
-        <button class="nav-pill" onclick="exportImage()">导出</button>
+        <button type="button" id="btn-export-all" class="nav-pill dim" onclick="exportAll()" style="display:none;">全部导出</button>
+        <button type="button" id="btn-theme" class="nav-icon-btn" onclick="toggleThemePopup(event)" aria-label="主题设置">◐</button>
+        <button type="button" class="nav-pill" onclick="exportImage()">导出</button>
     </div>
 </div>
 
 <!-- THEME POPUP -->
 <div id="theme-popup" class="theme-popup">
-    <button class="t-btn" id="t-dark"   onclick="setTheme('dark')">🌙 夜间</button>
-    <button class="t-btn" id="t-light"  onclick="setTheme('light')">☀️ 日间</button>
-    <button class="t-btn" id="t-system" onclick="setTheme('system')">跟随系统</button>
+    <button type="button" class="t-btn" id="t-dark"   onclick="setTheme('dark')">🌙 夜间</button>
+    <button type="button" class="t-btn" id="t-light"  onclick="setTheme('light')">☀️ 日间</button>
+    <button type="button" class="t-btn" id="t-system" onclick="setTheme('system')">跟随系统</button>
 </div>
 
 <!-- TOAST -->
@@ -70,27 +70,27 @@
 <!-- BOTTOM BAR -->
 <div class="bottom-bar">
     <div class="row">
-        <button class="collapse-toggle" id="btn-collapse" onclick="toggleBottomPanel()">
+        <button type="button" class="collapse-toggle" id="btn-collapse" onclick="toggleBottomPanel()">
             <span id="collapse-arrow">︿</span> 工具
         </button>
         <div class="icon-row">
-            <button class="sq-btn" id="btn-undo" onclick="undo()" disabled>↩</button>
-            <button class="sq-btn" id="btn-redo" onclick="redo()" disabled>↪</button>
+            <button type="button" class="sq-btn" id="btn-undo" onclick="undo()" disabled>↩</button>
+            <button type="button" class="sq-btn" id="btn-redo" onclick="redo()" disabled>↪</button>
         </div>
     </div>
 
     <div class="bottom-collapsible" id="bottom-collapsible">
         <div class="mode-row">
-            <button class="m-tab active" id="mode-pan"   onclick="switchMode('pan')">浏览</button>
-            <button class="m-tab"        id="mode-box"   onclick="switchMode('box')">拉框打码</button>
-            <button class="m-tab"        id="mode-brush" onclick="switchMode('brush')">涂抹打码</button>
-            <button class="m-tab"        id="mode-zone"  onclick="switchMode('zone')">禁止层</button>
+            <button type="button" class="m-tab active" id="mode-pan"   onclick="switchMode('pan')">浏览</button>
+            <button type="button" class="m-tab"        id="mode-box"   onclick="switchMode('box')">拉框打码</button>
+            <button type="button" class="m-tab"        id="mode-brush" onclick="switchMode('brush')">涂抹打码</button>
+            <button type="button" class="m-tab"        id="mode-zone"  onclick="switchMode('zone')">禁止层</button>
         </div>
 
         <div class="slider-row">
             <span class="s-label">模糊强度</span>
             <input type="range" id="blur-radius" min="5" max="40" value="18">
-            <button class="wm-btn" id="btn-toggle-wm" onclick="toggleWmMode()">全屏水印设置</button>
+            <button type="button" class="wm-btn" id="btn-toggle-wm" onclick="toggleWmMode()">全屏水印设置</button>
         </div>
 
         <!-- 水印自定义行 -->
@@ -110,15 +110,15 @@
                 </div>
             </div>
             <div class="wm-action-btns">
-                <button class="wm-btn-apply" onclick="confirmWatermark()">确定应用</button>
-                <button class="wm-btn-cancel" onclick="cancelWatermark()">取消</button>
+                <button type="button" class="wm-btn-apply" onclick="confirmWatermark()">确定应用</button>
+                <button type="button" class="wm-btn-cancel" onclick="cancelWatermark()">取消</button>
             </div>
         </div>
 
         <div class="zone-info-row" id="zone-info-row">
             <span class="zone-tip" id="zone-tip">空白拖拽新增 · 拖拽移动 · 点击删除</span>
             <span class="zone-count-badge" id="zone-count">0 个禁止层</span>
-            <button class="zone-clear-btn" onclick="clearZones()">全部清除</button>
+            <button type="button" class="zone-clear-btn" onclick="clearZones()">全部清除</button>
         </div>
     </div>
 </div>

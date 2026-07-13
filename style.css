@@ -47,7 +47,16 @@
         }
 
         input[type="file"] { display: none; }
-        button { cursor: pointer; }
+        button {
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+            background: none;
+            border: none;
+            font: inherit;
+            color: inherit;
+            outline: none;
+        }
 
         /* ══════════════════════════════
            TOP NAV
@@ -378,6 +387,19 @@
         }
         [data-theme="light"] .nav-icon-btn { border-color: rgba(0,0,0,0.15); }
         .nav-icon-btn:active { opacity: 0.5; }
+
+        .t-btn {
+            display: flex; align-items: center; gap: 8px;
+            width: 100%;
+            background: transparent;
+            color: var(--text);
+            font-family: 'Jost', sans-serif;
+            font-size: 12px; font-weight: 500;
+            letter-spacing: 0.04em;
+            transition: background 0.15s, color 0.15s;
+        }
+        .t-btn:active { background: var(--gold-dim); }
+        .t-btn.active { color: var(--gold); }
 
         .theme-popup {
             display: none;
