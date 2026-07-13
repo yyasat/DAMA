@@ -493,6 +493,7 @@
         const text = document.getElementById('wm-text').value || "仅供展示 禁止盗图";
         const color = document.getElementById('wm-color').value;
         const opacity = document.getElementById('wm-opacity').value;
+        const density = document.getElementById('wm-density').value;
 
         const fs = Math.max(16, Math.floor(canvas.width/24));
         ctx.save();
@@ -502,8 +503,8 @@
         ctx.rotate(-30*Math.PI/180);
         
         const diag = Math.sqrt(canvas.width**2 + canvas.height**2);
-        const stepX = ctx.measureText(text).width + 80;
-        const stepY = fs * 4;
+        const stepX = (ctx.measureText(text).width + 80) / density;
+        const stepY = (fs * 4) / density;
         
         for (let i = -diag; i < diag; i += stepX) {
             for (let j = -diag; j < diag; j += stepY) {
