@@ -30,8 +30,16 @@
 
     <div class="nav-wing right">
         <button id="btn-export-all" class="nav-pill dim" onclick="exportAll()" style="display:none;">全部导出</button>
+        <button id="btn-theme" class="nav-icon-btn" onclick="toggleThemePopup(event)" aria-label="主题设置">◐</button>
         <button class="nav-pill" onclick="exportImage()">导出</button>
     </div>
+</div>
+
+<!-- THEME POPUP -->
+<div id="theme-popup" class="theme-popup">
+    <button class="t-btn" id="t-dark"   onclick="setTheme('dark')">🌙 夜间</button>
+    <button class="t-btn" id="t-light"  onclick="setTheme('light')">☀️ 日间</button>
+    <button class="t-btn" id="t-system" onclick="setTheme('system')">跟随系统</button>
 </div>
 
 <!-- TOAST -->
@@ -107,12 +115,6 @@
         <span class="zone-tip" id="zone-tip">空白拖拽新增 · 拖拽移动 · 点击删除</span>
         <span class="zone-count-badge" id="zone-count">0 个禁止层</span>
         <button class="zone-clear-btn" onclick="clearZones()">全部清除</button>
-    </div>
-
-    <div class="theme-row">
-        <button class="t-btn" id="t-dark"   onclick="setTheme('dark')">🌙 夜间</button>
-        <button class="t-btn" id="t-light"  onclick="setTheme('light')">☀️ 日间</button>
-        <button class="t-btn" id="t-system" onclick="setTheme('system')">跟随系统</button>
     </div>
 </div>
 

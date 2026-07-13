@@ -29,8 +29,6 @@
         [data-theme="light"] .sq-btn { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.1); }
         [data-theme="light"] .mode-row { border-color: rgba(0,0,0,0.1); }
         [data-theme="light"] .m-tab { border-right-color: rgba(0,0,0,0.1); }
-        [data-theme="light"] .theme-row { border-color: rgba(0,0,0,0.1); }
-        [data-theme="light"] .t-btn { border-right-color: rgba(0,0,0,0.1); }
         [data-theme="light"] .export-bar-wrap { background: rgba(0,0,0,0.1); }
         [data-theme="light"] input[type="range"] { background: rgba(0,0,0,0.15); }
         [data-theme="light"] .toast { background: rgba(245,240,232,0.95); }
@@ -342,27 +340,47 @@
         }
         .wm-btn:hover { color: var(--gold); }
 
-        /* ── 主题切换行 ── */
-        .theme-row {
-            display: flex;
-            border: 1px solid rgba(255,255,255,0.07);
-            border-radius: 1px;
+        /* ── 主题切换弹窗 ── */
+        .nav-icon-btn {
+            background: none; border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 50%;
+            width: 26px; height: 26px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px; color: var(--gold);
+            cursor: pointer;
+            padding: 0;
+        }
+        [data-theme="light"] .nav-icon-btn { border-color: rgba(0,0,0,0.15); }
+        .nav-icon-btn:active { opacity: 0.5; }
+
+        .theme-popup {
+            display: none;
+            position: fixed;
+            top: calc(var(--nav-h) + env(safe-area-inset-top, 0px) + 6px);
+            right: 22px;
+            flex-direction: column;
+            background: var(--panel);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 6px;
             overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+            z-index: 300;
+            min-width: 130px;
         }
-        .t-btn {
-            flex: 1;
-            background: transparent;
-            border: none;
-            border-right: 1px solid rgba(255,255,255,0.07);
-            color: var(--muted2);
-            font-family: 'Jost', sans-serif;
-            font-size: 10px; font-weight: 500;
-            letter-spacing: 0.08em;
-            padding: 9px 0;
-            transition: all 0.15s;
+        [data-theme="light"] .theme-popup {
+            border-color: rgba(0,0,0,0.1);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
         }
-        .t-btn:last-child { border-right: none; }
-        .t-btn.active { background: var(--gold-dim); color: var(--gold); }
+        .theme-popup.open { display: flex; }
+        .theme-popup .t-btn {
+            flex: none;
+            border-right: none;
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+            text-align: left;
+            padding: 10px 14px;
+        }
+        [data-theme="light"] .theme-popup .t-btn { border-bottom-color: rgba(0,0,0,0.08); }
+        .theme-popup .t-btn:last-child { border-bottom: none; }
 
         /* ══════════════════════════════
            TOAST

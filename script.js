@@ -15,7 +15,23 @@
         });
         try { localStorage.setItem('dama_theme', theme); } catch(e) {}
         applyScheme(theme === 'system' ? (_mq.matches ? 'light' : 'dark') : theme);
+        closeThemePopup();
     }
+
+    function toggleThemePopup(e) {
+        if (e) e.stopPropagation();
+        document.getElementById('theme-popup').classList.toggle('open');
+    }
+    function closeThemePopup() {
+        document.getElementById('theme-popup').classList.remove('open');
+    }
+    document.addEventListener('click', function(e) {
+        const popup = document.getElementById('theme-popup');
+        const btn = document.getElementById('btn-theme');
+        if (popup.classList.contains('open') && !popup.contains(e.target) && e.target !== btn) {
+            closeThemePopup();
+        }
+    });
 
     _mq.addEventListener('change', e => {
         if (_currentTheme === 'system') applyScheme(e.matches ? 'light' : 'dark');
