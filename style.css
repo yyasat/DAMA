@@ -428,9 +428,8 @@
     
         .wm-setting-row {
             display: flex;
-            align-items: center;
+            flex-direction: column;
             gap: 10px;
-            flex-wrap: wrap;
             background: rgba(255,255,255,0.03);
             border: 1px solid rgba(255,255,255,0.07);
             border-radius: 4px;
@@ -439,6 +438,17 @@
         [data-theme="light"] .wm-setting-row {
             background: rgba(0,0,0,0.03);
             border-color: rgba(0,0,0,0.1);
+        }
+        .wm-row-1 {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .wm-row-2 {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
         }
         .wm-input-text {
             flex: 1; min-width: 120px;
@@ -449,10 +459,13 @@
         }
         [data-theme="light"] .wm-input-text { border-color: rgba(0,0,0,0.2); }
         .wm-input-color {
-            width: 24px; height: 24px; padding: 0; border: none; background: transparent; cursor: pointer;
+            width: 24px; height: 24px; padding: 0; border: none; background: transparent; cursor: pointer; flex-shrink: 0;
         }
         .wm-slider-wrap {
-            display: flex; align-items: center; gap: 6px; flex: 1; min-width: 100px;
+            display: flex; align-items: center; gap: 6px; flex: 1; min-width: 140px;
+        }
+        .wm-slider-wrap input[type="range"] {
+            flex: 1;
         }
         .wm-action-btns {
             display: flex; gap: 6px;
