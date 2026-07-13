@@ -46,6 +46,8 @@
 
     const canvas   = document.getElementById('canvas');
     const ctx      = canvas.getContext('2d', { willReadFrequently: true });
+    const wmCanvas = document.getElementById('wm-canvas');
+    const wmCtx    = wmCanvas.getContext('2d');
     const emptyEl  = document.getElementById('empty-state');
     const toastEl  = document.getElementById('toast');
 
@@ -59,9 +61,10 @@
     let movingZoneIndex = -1;
     let zoneStartPos    = null;
     
-    // 水印实时预览状态
-    let wmSnapshot = null;
-    let isWmMode = false;
+    // 水印图层状态（独立于主画布，随时可根据禁止层重新计算，不需要"烘焙"进图片）
+    let isWmMode = false;          // 是否正打开水印设置面板
+    let watermarkOn = false;       // 水印图层当前是否显示
+    let watermarkConfirmed = false;// 是否已经点过"确定应用"（用于取消时判断要不要恢复无水印）
 
     // 多图队列
     let imageQueue   = [];   // { dataUrl, editedData }
@@ -130,6 +133,7 @@
         if (Math.abs(w) < 10 || Math.abs(h) < 10) return;
         excludeZones.push({ x, y, w, h });
         drawZoneOverlay();
+        if (watermarkOn) drawRealTimeWatermark();
         showToast(`已新增禁止层，共 ${excludeZones.length} 个`);
     }
 
@@ -149,6 +153,7 @@
     function clearZones() {
         excludeZones = [];
         drawZoneOverlay();
+        if (watermarkOn) drawRealTimeWatermark();
         showToast("已清除全部禁止层");
     }
 
@@ -185,6 +190,7 @@
             ctx.putImageData(state.imgData, 0, 0);
             excludeZones = JSON.parse(JSON.stringify(state.zones));
             drawZoneOverlay(); // 刷新层级显示
+            if (watermarkOn) drawRealTimeWatermark();
             updateUndoRedoUI();
             showToast("已撤销");
         } else {
@@ -198,6 +204,7 @@
             ctx.putImageData(state.imgData, 0, 0);
             excludeZones = JSON.parse(JSON.stringify(state.zones));
             drawZoneOverlay();
+            if (watermarkOn) drawRealTimeWatermark();
             updateUndoRedoUI();
             showToast("已重做");
         }
@@ -273,6 +280,8 @@
             originalImage = img;
             canvas.width  = img.width;
             canvas.height = img.height;
+            wmCanvas.width  = img.width;
+            wmCanvas.height = img.height;
             if (item.editedData) {
                 ctx.putImageData(item.editedData, 0, 0);
                 historyStack = [{ imgData: item.editedData, zones: [] }];
@@ -284,9 +293,11 @@
             }
             emptyEl.style.display = 'none';
             canvas.style.display  = 'block';
+            wmCanvas.style.display = 'block';
             updateNavUI();
             updateUndoRedoUI();
             switchMode('pan');
+            if (watermarkOn) drawRealTimeWatermark();
             document.getElementById('workspace').scrollTop = 0;
         };
         img.src = item.dataUrl;
@@ -346,6 +357,10 @@
                     tc.height = img2.height;
                     tcx.drawImage(img2, 0, 0);
                 }
+                // 水印是独立图层，只对当前正在查看/编辑的这张图叠加实时水印效果
+                if (i === currentIndex && watermarkOn) {
+                    tcx.drawImage(wmCanvas, 0, 0, tc.width, tc.height);
+                }
                 
                 const blob = await new Promise(res => tc.toBlob(res, 'image/png', 1.0));
                 const url = URL.createObjectURL(blob);
@@ -377,9 +392,14 @@
     /* ── 单张导出 ── */
     function exportImage() {
         if (!originalImage) return showToast("还没有导入图片");
+        const tc = document.createElement('canvas');
+        tc.width = canvas.width; tc.height = canvas.height;
+        const tcx = tc.getContext('2d');
+        tcx.drawImage(canvas, 0, 0);
+        if (watermarkOn) tcx.drawImage(wmCanvas, 0, 0);
         const link = document.createElement('a');
         link.download = `dama_${String(currentIndex+1).padStart(2,'0')}.png`;
-        link.href = canvas.toDataURL('image/png', 1.0);
+        link.href = tc.toDataURL('image/png', 1.0);
         link.click();
         showToast("✓ 导出成功");
     }
@@ -472,8 +492,11 @@
                 excludeZones[movingZoneIndex].x = zoneStartPos.origX + dx;
                 excludeZones[movingZoneIndex].y = zoneStartPos.origY + dy;
                 drawZoneOverlay();
+                if (watermarkOn) drawRealTimeWatermark();
             } else {
-                drawZoneOverlay({ x: startX, y: startY, w: pos.x - startX, h: pos.y - startY });
+                const preview = { x: startX, y: startY, w: pos.x - startX, h: pos.y - startY };
+                drawZoneOverlay(preview);
+                if (watermarkOn) drawRealTimeWatermark(preview);
             }
         } else {
             const sz = parseInt(document.getElementById('blur-radius').value)*3;
@@ -503,14 +526,14 @@
                 }
                 movingZoneIndex = -1;
                 drawZoneOverlay();
-                if (isWmMode) drawRealTimeWatermark(); // 禁止层变化后，水印需要重新铺满空出的区域
+                if (watermarkOn) drawRealTimeWatermark(); // 禁止层变化后，水印实时铺满空出的区域
             } else {
                 const w = pos.x - startX, h = pos.y - startY;
                 if (Math.abs(w) >= 10 || Math.abs(h) >= 10) {
                     addZone(startX, startY, w, h);
-                    if (isWmMode) drawRealTimeWatermark();
                 } else {
                     drawZoneOverlay();
+                    if (watermarkOn) drawRealTimeWatermark();
                 }
             }
         } else {
@@ -525,17 +548,14 @@
     canvas.addEventListener('touchmove',  handleMove,  {passive:false});
     window.addEventListener('touchend',   handleEnd,   {passive:false});
 
-        /* ── 水印 (支持自定义) ── */
+        /* ── 水印 (支持自定义，独立图层实时渲染) ── */
     function toggleWmMode() {
         if (!originalImage) return showToast("请先导入图片");
-        if (isWmMode) return; // 已在水印编辑模式中，避免重复截图导致水印越叠越多
-        const row = document.getElementById('wm-setting-row');
         isWmMode = true;
-        // 保存打底图（不含水印，作为每次重绘的干净底图）
-        wmSnapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        row.style.display = 'flex';
+        watermarkOn = true;
+        document.getElementById('wm-setting-row').style.display = 'flex';
         drawRealTimeWatermark();
-        showToast("进入水印编辑模式");
+        showToast("水印已实时显示，移动/增删禁止层会自动跟随");
     }
 
     function hexToRgba(hex, alpha) {
@@ -546,65 +566,65 @@
         return `rgba(${r},${g},${b},${alpha})`;
     }
 
-    function drawRealTimeWatermark() {
-        if (!isWmMode || !wmSnapshot) return;
-        // 恢复底图
-        ctx.putImageData(wmSnapshot, 0, 0);
+    // extraZone: 正在拖拽新建、尚未真正加入 excludeZones 的预览框，传入后水印会临时也跳过这块区域
+    function drawRealTimeWatermark(extraZone) {
+        if (!wmCanvas.width) return;
+        wmCtx.clearRect(0, 0, wmCanvas.width, wmCanvas.height);
+        if (!watermarkOn) return;
 
         const text = document.getElementById('wm-text').value || "仅供展示 禁止盗图";
         const color = document.getElementById('wm-color').value;
         const opacity = document.getElementById('wm-opacity').value;
         const density = document.getElementById('wm-density').value;
 
-        const fs = Math.max(16, Math.floor(canvas.width/24));
-        ctx.save();
+        const fs = Math.max(16, Math.floor(wmCanvas.width/24));
+        wmCtx.save();
 
         // 用禁止层区域挖空裁剪区，让水印跳过这些区域
-        if (excludeZones.length > 0) {
-            ctx.beginPath();
-            ctx.rect(0, 0, canvas.width, canvas.height);
-            excludeZones.forEach(z => {
+        const zones = extraZone ? [...excludeZones, extraZone] : excludeZones;
+        if (zones.length > 0) {
+            wmCtx.beginPath();
+            wmCtx.rect(0, 0, wmCanvas.width, wmCanvas.height);
+            zones.forEach(z => {
                 const lx = Math.min(z.x, z.x + z.w);
                 const ly = Math.min(z.y, z.y + z.h);
                 const lw = Math.abs(z.w), lh = Math.abs(z.h);
-                ctx.rect(lx, ly, lw, lh);
+                wmCtx.rect(lx, ly, lw, lh);
             });
-            ctx.clip('evenodd');
+            wmCtx.clip('evenodd');
         }
 
-        ctx.font = `bold ${fs}px 'Jost', sans-serif`;
-        ctx.fillStyle = hexToRgba(color, opacity);
-        ctx.translate(canvas.width/2, canvas.height/2);
-        ctx.rotate(-30*Math.PI/180);
+        wmCtx.font = `bold ${fs}px 'Jost', sans-serif`;
+        wmCtx.fillStyle = hexToRgba(color, opacity);
+        wmCtx.translate(wmCanvas.width/2, wmCanvas.height/2);
+        wmCtx.rotate(-30*Math.PI/180);
         
-        const diag = Math.sqrt(canvas.width**2 + canvas.height**2);
-        const stepX = ctx.measureText(text).width + Math.max(20, 80 / density);
+        const diag = Math.sqrt(wmCanvas.width**2 + wmCanvas.height**2);
+        const stepX = wmCtx.measureText(text).width + Math.max(20, 80 / density);
         const stepY = fs * Math.max(1.5, 4 / density);
         
         for (let i = -diag; i < diag; i += stepX) {
             for (let j = -diag; j < diag; j += stepY) {
-                ctx.fillText(text, i, j);
+                wmCtx.fillText(text, i, j);
             }
         }
-        ctx.restore();
+        wmCtx.restore();
     }
 
     function confirmWatermark() {
         if (!isWmMode) return;
         isWmMode = false;
+        watermarkConfirmed = true;
         document.getElementById('wm-setting-row').style.display = 'none';
-        wmSnapshot = null;
-        saveState(); // 将应用了水印的画布保存进历史栈
-        showToast("✓ 水印已应用");
+        showToast("✓ 水印已应用，之后调整禁止层会自动实时更新");
     }
 
     function cancelWatermark() {
         if (!isWmMode) return;
         isWmMode = false;
         document.getElementById('wm-setting-row').style.display = 'none';
-        if (wmSnapshot) {
-            ctx.putImageData(wmSnapshot, 0, 0);
-            wmSnapshot = null;
-        }
-        showToast("已取消水印");
+        // 如果之前从未真正确认应用过，取消则完全去掉水印；否则保留上一次已确认的水印效果
+        watermarkOn = watermarkConfirmed;
+        drawRealTimeWatermark();
+        showToast(watermarkOn ? "已放弃本次修改" : "已取消水印");
     }
