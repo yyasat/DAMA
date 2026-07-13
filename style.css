@@ -252,7 +252,33 @@
         }
 
         /* undo/redo */
-        .row { display: flex; align-items: stretch; gap: 9px; justify-content: flex-end; }
+        .row { display: flex; align-items: stretch; gap: 9px; justify-content: space-between; }
+
+        .collapse-toggle {
+            background: none; border: none;
+            color: var(--muted2);
+            font-family: 'Jost', sans-serif;
+            font-size: 10px; font-weight: 500;
+            letter-spacing: 0.1em;
+            display: flex; align-items: center; gap: 5px;
+            padding: 0 4px;
+            cursor: pointer;
+        }
+        .collapse-toggle:active { opacity: 0.5; }
+        #collapse-arrow { display: inline-block; transition: transform 0.2s; font-size: 11px; }
+        .bottom-collapsible {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            overflow: hidden;
+            max-height: 500px;
+            opacity: 1;
+            transition: max-height 0.25s ease, opacity 0.2s ease;
+        }
+        .bottom-collapsible.collapsed {
+            max-height: 0;
+            opacity: 0;
+        }
 
         .icon-row { display: flex; gap: 8px; }
         .sq-btn {

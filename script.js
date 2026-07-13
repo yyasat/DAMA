@@ -216,6 +216,23 @@
         updateZoneUI();
     }
 
+    /* ── 底部工具栏折叠 ── */
+    function toggleBottomPanel() {
+        const panel = document.getElementById('bottom-collapsible');
+        const arrow = document.getElementById('collapse-arrow');
+        const collapsed = panel.classList.toggle('collapsed');
+        arrow.textContent = collapsed ? '﹀' : '︿';
+        try { localStorage.setItem('dama_panel_collapsed', collapsed ? '1' : '0'); } catch(e) {}
+    }
+    (function() {
+        let collapsed = false;
+        try { collapsed = localStorage.getItem('dama_panel_collapsed') === '1'; } catch(e) {}
+        if (collapsed) {
+            document.getElementById('bottom-collapsible').classList.add('collapsed');
+            document.getElementById('collapse-arrow').textContent = '﹀';
+        }
+    })();
+
     /* ── 多图队列 ── */
     document.getElementById('upload').addEventListener('change', function(e) {
         const files = Array.from(e.target.files);
