@@ -503,8 +503,8 @@
         ctx.rotate(-30*Math.PI/180);
         
         const diag = Math.sqrt(canvas.width**2 + canvas.height**2);
-        const stepX = (ctx.measureText(text).width + 80) / density;
-        const stepY = (fs * 4) / density;
+        const stepX = ctx.measureText(text).width + Math.max(20, 80 / density);
+        const stepY = fs * Math.max(1.5, 4 / density);
         
         for (let i = -diag; i < diag; i += stepX) {
             for (let j = -diag; j < diag; j += stepY) {
