@@ -340,6 +340,33 @@
     function prevImage() { loadImageAtIndex(currentIndex - 1); }
     function nextImage() { loadImageAtIndex(currentIndex + 1); }
 
+    function deleteCurrentImage() {
+        if (currentIndex < 0 || imageQueue.length === 0) return showToast("没有图片可删除");
+        imageQueue.splice(currentIndex, 1);
+
+        if (imageQueue.length === 0) {
+            currentIndex = -1;
+            originalImage = null;
+            excludeZones = [];
+            historyStack = []; historyStep = -1;
+            watermarkOn = false; watermarkConfirmed = false; isWmMode = false;
+            document.getElementById('wm-setting-row').style.display = 'none';
+            canvas.style.display = 'none';
+            wmCanvas.style.display = 'none';
+            emptyEl.style.display = 'flex';
+            updateNavUI();
+            updateUndoRedoUI();
+            drawZoneOverlay();
+            showToast("已删除，暂无图片");
+            return;
+        }
+
+        const nextIdx = Math.min(currentIndex, imageQueue.length - 1);
+        currentIndex = -1; // 强制 loadImageAtIndex 重新加载，跳过 saveCurrentEdits 覆盖已删除数据
+        loadImageAtIndex(nextIdx);
+        showToast(`已删除，剩余 ${imageQueue.length} 张`);
+    }
+
     function updateNavUI() {
         const nav    = document.getElementById('img-nav');
         const count  = document.getElementById('img-counter');

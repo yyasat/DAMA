@@ -132,6 +132,12 @@
         }
         .pg-btn:disabled { opacity: 0.18; cursor: default; }
 
+        .pg-btn-del {
+            font-size: 13px;
+            margin-left: 2px;
+        }
+        .pg-btn-del:hover { color: #e05555; }
+
         .pg-count {
             font-size: 10px;
             letter-spacing: 0.18em;
