@@ -144,6 +144,7 @@
         drawZoneOverlay();
         if (watermarkOn) drawRealTimeWatermark();
         showToast(`已新增禁止层，共 ${excludeZones.length} 个`);
+        saveState();
     }
 
         function getZoneAt(px, py) {
@@ -188,6 +189,7 @@
         drawZoneOverlay();
         if (watermarkOn) drawRealTimeWatermark();
         showToast("已清除全部禁止层");
+        saveState();
     }
 
     /* ── 统一撤销管理 ── */
@@ -623,6 +625,7 @@
                 resizingZoneIndex = -1;
                 drawZoneOverlay();
                 if (watermarkOn) drawRealTimeWatermark();
+                saveState();
             } else if (movingZoneIndex !== -1) {
                 const dx = pos.x - zoneStartPos.x;
                 const dy = pos.y - zoneStartPos.y;
@@ -633,6 +636,7 @@
                 movingZoneIndex = -1;
                 drawZoneOverlay();
                 if (watermarkOn) drawRealTimeWatermark(); // 禁止层变化后，水印实时铺满空出的区域
+                saveState();
             } else {
                 const w = pos.x - startX, h = pos.y - startY;
                 if (Math.abs(w) >= 10 || Math.abs(h) >= 10) {
