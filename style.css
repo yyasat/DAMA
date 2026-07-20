@@ -45,7 +45,6 @@
             display: flex;
             flex-direction: column;
         }
-        html { zoom: 90%; }
 
         input[type="file"] { display: none; }
         button {
