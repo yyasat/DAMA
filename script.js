@@ -460,6 +460,8 @@
         const bNext  = document.getElementById('btn-next');
         const bAll   = document.getElementById('btn-export-all');
 
+        document.querySelector('.top-nav').classList.toggle('has-images', imageQueue.length > 0);
+
         if (imageQueue.length > 0) {
             nav.classList.add('on');
             const cur   = String(currentIndex + 1).padStart(2, '0');

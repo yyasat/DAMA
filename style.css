@@ -66,8 +66,9 @@
             height: calc(var(--nav-h) + env(safe-area-inset-top, 0px));
             padding: env(safe-area-inset-top, 0px) 22px 0;
             display: flex;
-            align-items: flex-end;
+            align-items: center;
             justify-content: space-between;
+            gap: 10px;
             background: var(--panel);
             backdrop-filter: blur(24px);
             -webkit-backdrop-filter: blur(24px);
@@ -79,8 +80,7 @@
             display: flex;
             align-items: center;
             gap: 14px;
-            padding-bottom: 15px;
-            min-width: 90px;
+            flex: 0 0 auto;
         }
         .nav-wing.right { justify-content: flex-end; }
 
@@ -98,11 +98,13 @@
         .nav-pill.dim:hover { color: var(--gold); }
 
         .nav-core {
+            flex: 1;
+            min-width: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
+            justify-content: center;
             gap: 5px;
-            padding-bottom: 11px;
         }
 
         .brand {
@@ -113,13 +115,17 @@
             letter-spacing: 0.1em;
             color: var(--text);
             line-height: 1;
+            transition: opacity 0.2s ease;
+        }
+        .top-nav.has-images .brand {
+            display: none;
         }
 
         /* image counter row */
         .img-nav {
             display: none;
             align-items: center;
-            gap: 12px;
+            gap: 14px;
         }
         .img-nav.on { display: flex; }
 
@@ -134,7 +140,9 @@
 
         .pg-btn-del {
             font-size: 13px;
-            margin-left: 2px;
+            margin-left: 6px;
+            padding-left: 6px;
+            border-left: 1px solid var(--gold-edge);
         }
         .pg-btn-del:hover { color: #e05555; }
 
