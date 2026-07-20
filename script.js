@@ -343,6 +343,7 @@
         showToast(labels[mode] || "");
         drawZoneOverlay(); // 清除任何残留的预览框
         updateZoneUI();
+        setTimeout(updateAvailHeight, 0);
     }
 
     /* ── 底部工具栏折叠 ── */
@@ -352,6 +353,8 @@
         const collapsed = panel.classList.toggle('collapsed');
         arrow.textContent = collapsed ? '﹀' : '︿';
         try { localStorage.setItem('dama_panel_collapsed', collapsed ? '1' : '0'); } catch(e) {}
+        updateAvailHeight();
+        setTimeout(updateAvailHeight, 280); // 折叠动画结束后再校正一次
     }
     (function() {
         let collapsed = false;
@@ -361,6 +364,18 @@
             document.getElementById('collapse-arrow').textContent = '﹀';
         }
     })();
+
+    /* ── 计算工作区实际可用高度，确保图片永远完整可见，不被顶/底栏遮挡 ── */
+    function updateAvailHeight() {
+        const topNav = document.querySelector('.top-nav');
+        const bottomBar = document.querySelector('.bottom-bar');
+        if (!topNav || !bottomBar) return;
+        const h = window.innerHeight - topNav.offsetHeight - bottomBar.offsetHeight - 24;
+        document.documentElement.style.setProperty('--avail-h', Math.max(120, h) + 'px');
+    }
+    window.addEventListener('resize', updateAvailHeight);
+    window.addEventListener('orientationchange', () => setTimeout(updateAvailHeight, 200));
+    updateAvailHeight();
 
     /* ── 多图队列 ── */
     document.getElementById('upload').addEventListener('change', function(e) {
