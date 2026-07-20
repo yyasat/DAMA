@@ -73,6 +73,88 @@
     let imageQueue   = [];   // { dataUrl, editedData }
     let currentIndex = -1;
 
+    /* ── 手动缩放/平移视图 ── */
+    const canvasWrap = document.getElementById('canvas-wrap');
+    let viewScale = 1, viewX = 0, viewY = 0;
+    const VIEW_MIN = 1, VIEW_MAX = 6;
+    let pinchActive = false, pinchStartDist = 0, pinchStartScale = 1, pinchLastMid = null;
+    let panActive = false, panStart = null, panOrigView = null;
+    let lastTapTime = 0, lastTapX = 0, lastTapY = 0;
+
+    function applyView() {
+        canvasWrap.style.transform = `translate(${viewX}px, ${viewY}px) scale(${viewScale})`;
+    }
+    function resetView() {
+        viewScale = 1; viewX = 0; viewY = 0;
+        applyView();
+    }
+    function zoomTo(newScale, clientX, clientY) {
+        newScale = Math.min(VIEW_MAX, Math.max(VIEW_MIN, newScale));
+        const rect = canvasWrap.getBoundingClientRect();
+        const lx = (clientX - rect.left) / viewScale;
+        const ly = (clientY - rect.top) / viewScale;
+        viewX += lx * (viewScale - newScale);
+        viewY += ly * (viewScale - newScale);
+        viewScale = newScale;
+        if (viewScale <= 1.001) { viewScale = 1; viewX = 0; viewY = 0; }
+        applyView();
+    }
+    function dist(t0, t1) { return Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY); }
+    function midpoint(t0, t1) { return { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 }; }
+
+    function cancelActiveDraw() {
+        if (isDrawing && currentMode === 'box' && snapshot) ctx.putImageData(snapshot, 0, 0);
+        isDrawing = false;
+        movingZoneIndex = -1;
+        resizingZoneIndex = -1;
+        drawZoneOverlay();
+    }
+
+    function beginPinch(e) {
+        if (e.cancelable) e.preventDefault();
+        cancelActiveDraw();
+        panActive = false;
+        pinchActive = true;
+        pinchStartDist = dist(e.touches[0], e.touches[1]);
+        pinchStartScale = viewScale;
+        pinchLastMid = midpoint(e.touches[0], e.touches[1]);
+    }
+    function updatePinch(e) {
+        if (e.touches.length < 2) return;
+        if (e.cancelable) e.preventDefault();
+        const d = dist(e.touches[0], e.touches[1]);
+        const mid = midpoint(e.touches[0], e.touches[1]);
+        const newScale = pinchStartScale * (d / pinchStartDist);
+        zoomTo(newScale, mid.x, mid.y);
+        viewX += mid.x - pinchLastMid.x;
+        viewY += mid.y - pinchLastMid.y;
+        pinchLastMid = mid;
+        applyView();
+    }
+
+    function beginViewPan(e) {
+        if (e.cancelable) e.preventDefault();
+        panActive = true;
+        const p = e.touches ? e.touches[0] : e;
+        panStart = { x: p.clientX, y: p.clientY };
+        panOrigView = { x: viewX, y: viewY };
+    }
+    function updateViewPan(e) {
+        if (e.cancelable) e.preventDefault();
+        const p = e.touches ? e.touches[0] : e;
+        viewX = panOrigView.x + (p.clientX - panStart.x);
+        viewY = panOrigView.y + (p.clientY - panStart.y);
+        applyView();
+    }
+
+    document.getElementById('workspace').addEventListener('wheel', function(e) {
+        if (!originalImage) return;
+        if (!(e.ctrlKey || e.metaKey)) return; // 触控板双指捏合会自动带上 ctrlKey；普通滚轮需按住 Ctrl/⌘ 才缩放，避免影响正常滚动
+        e.preventDefault();
+        const factor = Math.exp(-e.deltaY * 0.0015);
+        zoomTo(viewScale * factor, e.clientX, e.clientY);
+    }, { passive: false });
+
     /* ── Toast ── */
     let _toastTimer;
     function showToast(msg, duration = 2200) {
@@ -333,6 +415,7 @@
             updateNavUI();
             updateUndoRedoUI();
             switchMode('pan');
+            resetView();
             if (watermarkOn) drawRealTimeWatermark();
             document.getElementById('workspace').scrollTop = 0;
         };
@@ -359,6 +442,7 @@
             updateNavUI();
             updateUndoRedoUI();
             drawZoneOverlay();
+            resetView();
             showToast("已删除，暂无图片");
             return;
         }
@@ -505,7 +589,25 @@
 
     /* ── 绘图事件 ── */
     function handleStart(e) {
-        if (!originalImage || currentMode === 'pan') return;
+        if (!originalImage) return;
+        if (e.touches && e.touches.length >= 2) { beginPinch(e); return; }
+
+        // 已放大时，原地双击/双触可复位到 100%
+        if (viewScale > 1.001) {
+            const now = Date.now();
+            const p = e.touches ? e.touches[0] : e;
+            if (now - lastTapTime < 350 && Math.hypot(p.clientX - lastTapX, p.clientY - lastTapY) < 30) {
+                resetView();
+                lastTapTime = 0;
+                return;
+            }
+            lastTapTime = now; lastTapX = p.clientX; lastTapY = p.clientY;
+        }
+
+        if (currentMode === 'pan') {
+            if (viewScale > 1.001) beginViewPan(e);
+            return;
+        }
         // 水印编辑模式下，只允许继续调整禁止层，其余模式（拉框/涂抹）仍然屏蔽
         if (isWmMode && currentMode !== 'zone') return;
         if (e.cancelable) e.preventDefault();
@@ -556,6 +658,8 @@
     }
     
     function handleMove(e) {
+        if (pinchActive) { updatePinch(e); return; }
+        if (panActive) { updateViewPan(e); return; }
         if (!isDrawing || currentMode === 'pan') return;
         if (isWmMode && currentMode !== 'zone') return;
         if (e.cancelable) e.preventDefault();
@@ -597,6 +701,11 @@
     }
     
     function handleEnd(e) {
+        if (pinchActive) {
+            if (!e.touches || e.touches.length < 2) pinchActive = false;
+            return;
+        }
+        if (panActive) { panActive = false; return; }
         if (!isDrawing || currentMode === 'pan') return;
         if (isWmMode && currentMode !== 'zone') return;
         isDrawing = false;
@@ -652,7 +761,7 @@
     }
 
     canvas.addEventListener('mousedown',  handleStart);
-    canvas.addEventListener('mousemove',  handleMove);
+    window.addEventListener('mousemove',  handleMove);
     window.addEventListener('mouseup',    handleEnd);
     canvas.addEventListener('touchstart', handleStart, {passive:false});
     canvas.addEventListener('touchmove',  handleMove,  {passive:false});
