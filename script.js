@@ -370,7 +370,11 @@
         const topNav = document.querySelector('.top-nav');
         const bottomBar = document.querySelector('.bottom-bar');
         if (!topNav || !bottomBar) return;
-        const h = window.innerHeight - topNav.offsetHeight - bottomBar.offsetHeight - 24;
+        // 用 getBoundingClientRect 取真实屏幕坐标，避免 CSS zoom 缩放后
+        // window.innerHeight（未缩放）与 offsetHeight（已缩放）单位不一致导致算多了
+        const topRect = topNav.getBoundingClientRect();
+        const bottomRect = bottomBar.getBoundingClientRect();
+        const h = bottomRect.top - topRect.bottom - 24;
         document.documentElement.style.setProperty('--avail-h', Math.max(120, h) + 'px');
     }
     window.addEventListener('resize', updateAvailHeight);
