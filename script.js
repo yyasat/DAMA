@@ -576,7 +576,14 @@
         files.forEach(file => {
             const reader = new FileReader();
             reader.onload = ev => {
-                imageQueue.push({ dataUrl: ev.target.result, editedData: null });
+                // 提取文件的修改时间作为日期
+                const fileDate = file.lastModified ? new Date(file.lastModified) : new Date();
+                imageQueue.push({ 
+                    dataUrl: ev.target.result, 
+                    editedData: null,
+                    date: fileDate,
+                    fileName: file.name
+                });
                 loaded++;
                 if (loaded === files.length) {
                     loadImageAtIndex(startIdx);
@@ -623,6 +630,7 @@
             resetView();
             if (watermarkOn) drawRealTimeWatermark();
             document.getElementById('workspace').scrollTop = 0;
+            updateDateOverlay(); // 更新日期悬浮显示
         };
         img.src = item.dataUrl;
     }
@@ -648,6 +656,7 @@
             updateUndoRedoUI();
             drawZoneOverlay();
             resetView();
+            updateDateOverlay(); // 清除日期显示
             showToast("已删除，暂无图片");
             return;
         }
@@ -1200,4 +1209,24 @@
         watermarkOn = watermarkConfirmed;
         drawRealTimeWatermark();
         showToast(watermarkOn ? "已放弃本次修改" : "已取消水印");
+    }
+
+    /* ── 日期悬浮显示 ── */
+    function updateDateOverlay() {
+        const dateOverlay = document.getElementById('date-overlay');
+        if (!dateOverlay) return;
+        
+        if (currentIndex >= 0 && imageQueue[currentIndex] && imageQueue[currentIndex].date) {
+            const date = imageQueue[currentIndex].date;
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            
+            dateOverlay.textContent = `${year}-${month}-${day} ${hours}:${minutes}`;
+            dateOverlay.style.display = 'block';
+        } else {
+            dateOverlay.style.display = 'none';
+        }
     }
