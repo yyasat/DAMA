@@ -64,6 +64,13 @@
     let resizeCorner      = null; // 当前拖动的是哪个角：nw/ne/sw/se
     let resizeAnchor      = null; // 缩放时固定不动的对角坐标
     
+    // 裁剪模式状态
+    let cropRect = null;  // { x, y, w, h } 裁剪框
+    let cropDragging = false;
+    let cropResizing = false;
+    let cropResizeHandle = null; // 'nw', 'ne', 'sw', 'se', 'n', 's', 'e', 'w'
+    let cropDragStart = null;
+    
     // 水印图层状态（独立于主画布，随时可根据禁止层重新计算，不需要"烘焙"进图片）
     let isWmMode = false;          // 是否正打开水印设置面板
     let watermarkOn = false;       // 水印图层当前是否显示
@@ -274,6 +281,165 @@
         saveState();
     }
 
+    /* ── 裁剪功能 ── */
+    function drawCropOverlay() {
+        const svg = document.getElementById('zone-svg');
+        if (!svg || !canvas.width) return;
+        
+        if (currentMode !== 'crop' || !cropRect) {
+            // 非裁剪模式或没有裁剪框时，不绘制
+            return;
+        }
+        
+        svg.setAttribute('viewBox', `0 0 ${canvas.width} ${canvas.height}`);
+        const sw = Math.max(3, canvas.width / 250);
+        const da = `${Math.max(10, canvas.width / 60)} ${Math.max(6, canvas.width / 100)}`;
+        
+        const x = Math.min(cropRect.x, cropRect.x + cropRect.w);
+        const y = Math.min(cropRect.y, cropRect.y + cropRect.h);
+        const w = Math.abs(cropRect.w);
+        const h = Math.abs(cropRect.h);
+        
+        // 绘制遮罩区域（裁剪框外的半透明蒙版）
+        const maskHtml = `
+            <defs>
+                <mask id="crop-mask">
+                    <rect x="0" y="0" width="${canvas.width}" height="${canvas.height}" fill="white"/>
+                    <rect x="${x}" y="${y}" width="${w}" height="${h}" fill="black"/>
+                </mask>
+            </defs>
+            <rect x="0" y="0" width="${canvas.width}" height="${canvas.height}" 
+                  fill="rgba(0,0,0,0.5)" mask="url(#crop-mask)"/>
+        `;
+        
+        // 绘制裁剪框边框
+        const frameHtml = `
+            <rect x="${x}" y="${y}" width="${w}" height="${h}"
+                  fill="none" stroke="#C9A96C" stroke-width="${sw}"
+                  stroke-dasharray="${da}"/>
+        `;
+        
+        // 绘制8个缩放手柄（四角+四边）
+        const hr = Math.max(8, canvas.width / 120);
+        const hsw = Math.max(2, canvas.width / 400);
+        const handles = [
+            ['nw', x, y],
+            ['n', x + w/2, y],
+            ['ne', x + w, y],
+            ['e', x + w, y + h/2],
+            ['se', x + w, y + h],
+            ['s', x + w/2, y + h],
+            ['sw', x, y + h],
+            ['w', x, y + h/2]
+        ].map(([pos, hx, hy]) => 
+            `<circle cx="${hx}" cy="${hy}" r="${hr}" fill="#C9A96C" stroke="#fff" stroke-width="${hsw}"/>`
+        ).join('');
+        
+        // 绘制中心确认按钮
+        const centerX = x + w/2;
+        const centerY = y + h/2;
+        const btnR = Math.max(25, canvas.width / 30);
+        const checkIcon = `
+            <circle cx="${centerX}" cy="${centerY}" r="${btnR}" fill="#C9A96C" stroke="#fff" stroke-width="${hsw * 2}"/>
+            <text x="${centerX}" y="${centerY}" font-size="${btnR * 1.2}" fill="#fff" 
+                  text-anchor="middle" dominant-baseline="middle" font-family="sans-serif">✓</text>
+        `;
+        
+        svg.innerHTML = maskHtml + frameHtml + handles + checkIcon;
+    }
+
+    function getCropHandleAt(px, py) {
+        if (!cropRect) return null;
+        
+        const x = Math.min(cropRect.x, cropRect.x + cropRect.w);
+        const y = Math.min(cropRect.y, cropRect.y + cropRect.h);
+        const w = Math.abs(cropRect.w);
+        const h = Math.abs(cropRect.h);
+        
+        const hitR = Math.max(20, canvas.width / 35);
+        
+        const handles = {
+            nw: { x, y },
+            n: { x: x + w/2, y },
+            ne: { x: x + w, y },
+            e: { x: x + w, y: y + h/2 },
+            se: { x: x + w, y: y + h },
+            s: { x: x + w/2, y: y + h },
+            sw: { x, y: y + h },
+            w: { x, y: y + h/2 }
+        };
+        
+        for (const handle in handles) {
+            const h = handles[handle];
+            if (Math.hypot(px - h.x, py - h.y) <= hitR) {
+                return handle;
+            }
+        }
+        return null;
+    }
+
+    function isInsideCropRect(px, py) {
+        if (!cropRect) return false;
+        const x = Math.min(cropRect.x, cropRect.x + cropRect.w);
+        const y = Math.min(cropRect.y, cropRect.y + cropRect.h);
+        const w = Math.abs(cropRect.w);
+        const h = Math.abs(cropRect.h);
+        return px >= x && px <= x + w && py >= y && py <= y + h;
+    }
+
+    function applyCrop() {
+        if (!cropRect || !originalImage) return;
+        
+        const x = Math.min(cropRect.x, cropRect.x + cropRect.w);
+        const y = Math.min(cropRect.y, cropRect.y + cropRect.h);
+        const w = Math.abs(cropRect.w);
+        const h = Math.abs(cropRect.h);
+        
+        if (w < 10 || h < 10) {
+            showToast("裁剪区域太小");
+            return;
+        }
+        
+        // 裁剪当前画布内容
+        const croppedData = ctx.getImageData(x, y, w, h);
+        
+        // 调整画布大小
+        canvas.width = w;
+        canvas.height = h;
+        wmCanvas.width = w;
+        wmCanvas.height = h;
+        
+        // 绘制裁剪后的内容
+        ctx.putImageData(croppedData, 0, 0);
+        
+        // 调整禁止层坐标
+        excludeZones = excludeZones.map(z => ({
+            x: z.x - x,
+            y: z.y - y,
+            w: z.w,
+            h: z.h
+        })).filter(z => {
+            const zx = Math.min(z.x, z.x + z.w);
+            const zy = Math.min(z.y, z.y + z.h);
+            const zw = Math.abs(z.w);
+            const zh = Math.abs(z.h);
+            return zx + zw > 0 && zy + zh > 0 && zx < w && zy < h;
+        });
+        
+        // 重置裁剪框
+        cropRect = null;
+        
+        // 保存状态
+        saveState();
+        
+        // 刷新显示
+        drawZoneOverlay();
+        if (watermarkOn) drawRealTimeWatermark();
+        
+        showToast("✓ 裁剪完成");
+        switchMode('pan');
+    }
+
     /* ── 统一撤销管理 ── */
     function saveState() {
         // 在操作完成后保存画布快照
@@ -334,14 +500,23 @@
         isDrawing = false;
         movingZoneIndex = -1;
         resizingZoneIndex = -1;
-        ['pan','box','brush','zone'].forEach(m => {
+        cropDragging = false;
+        cropResizing = false;
+        ['pan','box','brush','crop','zone'].forEach(m => {
             const el = document.getElementById('mode-' + m);
             if (el) el.classList.remove('active');
         });
         document.getElementById('mode-' + mode).classList.add('active');
-        const labels = { pan: "浏览模式", box: "拉框打码模式", brush: "涂抹打码模式", zone: "禁止层模式 — 空白拖拽新增，拖拽移动，拖角缩放，原地点击删除" };
+        const labels = { 
+            pan: "浏览模式", 
+            box: "拉框打码模式", 
+            brush: "涂抹打码模式", 
+            crop: "裁剪模式 — 拖拽选区，拖角/边缘调整，点击确认裁剪",
+            zone: "禁止层模式 — 空白拖拽新增，拖拽移动，拖角缩放，原地点击删除" 
+        };
         showToast(labels[mode] || "");
         drawZoneOverlay(); // 清除任何残留的预览框
+        drawCropOverlay(); // 绘制/清除裁剪框
         updateZoneUI();
         setTimeout(updateAvailHeight, 0);
     }
@@ -629,6 +804,56 @@
             if (viewScale > 1.001) beginViewPan(e);
             return;
         }
+        
+        // 裁剪模式
+        if (currentMode === 'crop') {
+            if (e.cancelable) e.preventDefault();
+            const pos = getEventPos(e);
+            
+            // 检查是否点击确认按钮位置（裁剪框中心）
+            if (cropRect && isInsideCropRect(pos.x, pos.y)) {
+                const x = Math.min(cropRect.x, cropRect.x + cropRect.w);
+                const y = Math.min(cropRect.y, cropRect.y + cropRect.h);
+                const w = Math.abs(cropRect.w);
+                const h = Math.abs(cropRect.h);
+                const centerX = x + w/2;
+                const centerY = y + h/2;
+                const hitR = Math.max(30, canvas.width / 25);
+                if (Math.hypot(pos.x - centerX, pos.y - centerY) <= hitR) {
+                    applyCrop();
+                    return;
+                }
+            }
+            
+            // 检查是否点击缩放手柄
+            const handle = getCropHandleAt(pos.x, pos.y);
+            if (handle) {
+                cropResizing = true;
+                cropResizeHandle = handle;
+                const x = Math.min(cropRect.x, cropRect.x + cropRect.w);
+                const y = Math.min(cropRect.y, cropRect.y + cropRect.h);
+                const w = Math.abs(cropRect.w);
+                const h = Math.abs(cropRect.h);
+                // 存储调整起始点和原始矩形
+                cropDragStart = { x: pos.x, y: pos.y, origRect: { x, y, w, h } };
+                return;
+            }
+            
+            // 检查是否在裁剪框内（移动）
+            if (cropRect && isInsideCropRect(pos.x, pos.y)) {
+                cropDragging = true;
+                cropDragStart = { x: pos.x, y: pos.y, origRect: { ...cropRect } };
+                return;
+            }
+            
+            // 否则开始绘制新裁剪框
+            isDrawing = true;
+            startX = pos.x;
+            startY = pos.y;
+            cropRect = { x: startX, y: startY, w: 0, h: 0 };
+            return;
+        }
+        
         // 水印编辑模式下，只允许继续调整禁止层，其余模式（拉框/涂抹）仍然屏蔽
         if (isWmMode && currentMode !== 'zone') return;
         if (e.cancelable) e.preventDefault();
@@ -681,7 +906,77 @@
     function handleMove(e) {
         if (pinchActive) { updatePinch(e); return; }
         if (panActive) { updateViewPan(e); return; }
-        if (!isDrawing || currentMode === 'pan') return;
+        if (!isDrawing && !cropDragging && !cropResizing) return;
+        if (currentMode === 'pan') return;
+        
+        // 裁剪模式处理
+        if (currentMode === 'crop') {
+            if (e.cancelable) e.preventDefault();
+            const pos = getEventPos(e);
+            
+            if (cropResizing && cropRect && cropDragStart) {
+                const dx = pos.x - cropDragStart.x;
+                const dy = pos.y - cropDragStart.y;
+                const orig = cropDragStart.origRect;
+                
+                // 根据手柄位置调整裁剪框
+                switch (cropResizeHandle) {
+                    case 'nw':
+                        cropRect.x = orig.x + dx;
+                        cropRect.y = orig.y + dy;
+                        cropRect.w = orig.w - dx;
+                        cropRect.h = orig.h - dy;
+                        break;
+                    case 'n':
+                        cropRect.y = orig.y + dy;
+                        cropRect.h = orig.h - dy;
+                        break;
+                    case 'ne':
+                        cropRect.y = orig.y + dy;
+                        cropRect.w = orig.w + dx;
+                        cropRect.h = orig.h - dy;
+                        break;
+                    case 'e':
+                        cropRect.w = orig.w + dx;
+                        break;
+                    case 'se':
+                        cropRect.w = orig.w + dx;
+                        cropRect.h = orig.h + dy;
+                        break;
+                    case 's':
+                        cropRect.h = orig.h + dy;
+                        break;
+                    case 'sw':
+                        cropRect.x = orig.x + dx;
+                        cropRect.w = orig.w - dx;
+                        cropRect.h = orig.h + dy;
+                        break;
+                    case 'w':
+                        cropRect.x = orig.x + dx;
+                        cropRect.w = orig.w - dx;
+                        break;
+                }
+                drawCropOverlay();
+                return;
+            }
+            
+            if (cropDragging && cropRect && cropDragStart) {
+                const dx = pos.x - cropDragStart.x;
+                const dy = pos.y - cropDragStart.y;
+                cropRect.x = cropDragStart.origRect.x + dx;
+                cropRect.y = cropDragStart.origRect.y + dy;
+                drawCropOverlay();
+                return;
+            }
+            
+            if (isDrawing) {
+                cropRect.w = pos.x - startX;
+                cropRect.h = pos.y - startY;
+                drawCropOverlay();
+                return;
+            }
+        }
+        
         if (isWmMode && currentMode !== 'zone') return;
         if (e.cancelable) e.preventDefault();
         const pos = getEventPos(e);
@@ -727,6 +1022,33 @@
             return;
         }
         if (panActive) { panActive = false; return; }
+        
+        // 裁剪模式处理
+        if (currentMode === 'crop') {
+            if (cropResizing) {
+                cropResizing = false;
+                cropResizeHandle = null;
+                cropDragStart = null;
+                return;
+            }
+            if (cropDragging) {
+                cropDragging = false;
+                cropDragStart = null;
+                return;
+            }
+            if (isDrawing) {
+                isDrawing = false;
+                const w = Math.abs(cropRect.w);
+                const h = Math.abs(cropRect.h);
+                if (w < 10 || h < 10) {
+                    cropRect = null;
+                    drawCropOverlay();
+                }
+                return;
+            }
+            return;
+        }
+        
         if (!isDrawing || currentMode === 'pan') return;
         if (isWmMode && currentMode !== 'zone') return;
         isDrawing = false;
