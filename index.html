@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>DAMA — 打码神器</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- TOP NAV -->
+<div class="top-nav">
+    <div class="nav-wing">
+        <label class="nav-pill">
+            <input type="file" id="upload" accept="image/*" multiple>
+            ＋ 导入
+        </label>
+    </div>
+
+    <div class="nav-core">
+        <span class="brand">打码神器</span>
+        <div id="img-nav" class="img-nav">
+            <button type="button" id="btn-prev" class="pg-btn" onclick="prevImage()">‹</button>
+            <span id="img-counter" class="pg-count">01 / 01</span>
+            <button type="button" id="btn-next" class="pg-btn" onclick="nextImage()">›</button>
+            <button type="button" id="btn-delete" class="pg-btn pg-btn-del" onclick="deleteCurrentImage()">🗑</button>
+        </div>
+    </div>
+
+    <div class="nav-wing right">
+        <button type="button" id="btn-export-all" class="nav-pill dim" onclick="exportAll()" style="display:none;">全部导出</button>
+        <button type="button" id="btn-theme" class="nav-icon-btn" onclick="toggleThemePopup(event)" aria-label="主题设置">◐</button>
+        <button type="button" class="nav-pill" onclick="exportImage()">导出</button>
+    </div>
+</div>
+
+<!-- THEME POPUP -->
+<div id="theme-popup" class="theme-popup">
+    <button type="button" class="t-btn" id="t-dark"   onclick="setTheme('dark')">🌙 夜间</button>
+    <button type="button" class="t-btn" id="t-light"  onclick="setTheme('light')">☀️ 日间</button>
+    <button type="button" class="t-btn" id="t-system" onclick="setTheme('system')">跟随系统</button>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="toast"></div>
+
+<!-- EXPORT OVERLAY -->
+<div id="export-overlay" class="export-overlay">
+    <div class="export-title">正在打包导出…</div>
+    <div class="export-bar-wrap">
+        <div id="export-bar" class="export-bar-fill"></div>
+    </div>
+    <div id="export-sub" class="export-sub">0 / 0</div>
+</div>
+
+<!-- WORKSPACE -->
+<div class="workspace" id="workspace">
+    <div class="empty-wrap" id="empty-state">
+        <div class="empty-ring">✦</div>
+        <div class="empty-h">还没有照片</div>
+        <div class="empty-s">点击左上角导入</div>
+    </div>
+    <div class="canvas-wrap" id="canvas-wrap">
+        <canvas id="canvas"></canvas>
+        <canvas id="wm-canvas"></canvas>
+        <svg id="zone-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+</div>
+
+<!-- BOTTOM BAR -->
+<div class="bottom-bar">
+    <div class="row">
+        <button type="button" class="collapse-toggle" id="btn-collapse" onclick="toggleBottomPanel()">
+            <span id="collapse-arrow">︿</span> 工具
+        </button>
+        <div class="icon-row">
+            <button type="button" class="sq-btn" id="btn-undo" onclick="undo()" disabled>↩</button>
+            <button type="button" class="sq-btn" id="btn-redo" onclick="redo()" disabled>↪</button>
+        </div>
+    </div>
+
+    <div class="bottom-collapsible" id="bottom-collapsible">
+        <div class="mode-row">
+            <button type="button" class="m-tab active" id="mode-pan"   onclick="switchMode('pan')">浏览</button>
+            <button type="button" class="m-tab"        id="mode-box"   onclick="switchMode('box')">拉框打码</button>
+            <button type="button" class="m-tab"        id="mode-brush" onclick="switchMode('brush')">涂抹打码</button>
+            <button type="button" class="m-tab"        id="mode-zone"  onclick="switchMode('zone')">禁止层</button>
+        </div>
+
+        <div class="slider-row">
+            <span class="s-label">模糊强度</span>
+            <input type="range" id="blur-radius" min="5" max="40" value="18">
+            <button type="button" class="wm-btn" id="btn-toggle-wm" onclick="toggleWmMode()">全屏水印设置</button>
+        </div>
+
+        <!-- 水印自定义行 -->
+        <div class="wm-setting-row" id="wm-setting-row" style="display: none;">
+            <div class="wm-row-1">
+                <input type="text" id="wm-text" class="wm-input-text" value="仅供展示 禁止盗图" placeholder="水印内容" oninput="drawRealTimeWatermark()">
+                <input type="color" id="wm-color" class="wm-input-color" value="#ffffff" oninput="drawRealTimeWatermark()">
+            </div>
+            <div class="wm-row-2">
+                <div class="wm-slider-wrap">
+                    <span class="s-label">透明度</span>
+                    <input type="range" id="wm-opacity" min="0" max="1" step="0.05" value="0.3" oninput="drawRealTimeWatermark()">
+                </div>
+                <div class="wm-slider-wrap">
+                    <span class="s-label">密度</span>
+                    <input type="range" id="wm-density" min="0.5" max="3" step="0.1" value="1" oninput="drawRealTimeWatermark()">
+                </div>
+            </div>
+            <div class="wm-action-btns">
+                <button type="button" class="wm-btn-apply" onclick="confirmWatermark()">确定应用</button>
+                <button type="button" class="wm-btn-cancel" onclick="cancelWatermark()">取消</button>
+            </div>
+        </div>
+
+        <div class="zone-info-row" id="zone-info-row">
+            <span class="zone-tip" id="zone-tip">空白拖拽新增 · 拖拽移动 · 拖角缩放 · 点击删除</span>
+            <span class="zone-count-badge" id="zone-count">0 个禁止层</span>
+            <button type="button" class="zone-clear-btn" onclick="clearZones()">全部清除</button>
+        </div>
+    </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
