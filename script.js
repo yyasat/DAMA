@@ -390,13 +390,24 @@
     function applyCrop() {
         if (!cropRect || !originalImage) return;
         
-        const x = Math.min(cropRect.x, cropRect.x + cropRect.w);
-        const y = Math.min(cropRect.y, cropRect.y + cropRect.h);
-        const w = Math.abs(cropRect.w);
-        const h = Math.abs(cropRect.h);
+        let x = Math.min(cropRect.x, cropRect.x + cropRect.w);
+        let y = Math.min(cropRect.y, cropRect.y + cropRect.h);
+        let w = Math.abs(cropRect.w);
+        let h = Math.abs(cropRect.h);
         
         if (w < 10 || h < 10) {
             showToast("裁剪区域太小");
+            return;
+        }
+        
+        // 限制裁剪区域不能超出画布范围
+        x = Math.max(0, Math.min(x, canvas.width));
+        y = Math.max(0, Math.min(y, canvas.height));
+        w = Math.min(w, canvas.width - x);
+        h = Math.min(h, canvas.height - y);
+        
+        if (w < 10 || h < 10) {
+            showToast("裁剪区域无效");
             return;
         }
         
